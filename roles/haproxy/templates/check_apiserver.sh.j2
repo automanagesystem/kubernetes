@@ -1,0 +1,11 @@
+#!/bin/sh
+
+errorExit() {
+    echo "*** $*" 1>&2
+    exit 1
+}
+
+curl --silent --max-time 2 --insecure http://ha-proxy1.tech1a.sso:6443/ -o /dev/null || errorExit "Error GET https://172.30.90.101:6443/"
+if ip addr | grep -q 172.30.90.100; then
+    curl --silent --max-time 2 --insecure http://172.30.90.100:6443/ -o /dev/null || errorExit "Error GET https://172.30.90.100:6443/"
+fi

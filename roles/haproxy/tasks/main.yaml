@@ -1,0 +1,57 @@
+- name: Install pkgs 
+  apt:
+    name: "{{ packages }}"
+    update_cache: yes
+  vars:
+    packages:
+    - keepalived
+    - haproxy
+    - psmisc
+- name: copy haproxy config files
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+- name: copy keepalived config file
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+- name: enable services
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      systemctl enable haproxy.service
+      systemctl enable keepalived.service
+- name: resatrt haproxy service
+  service:
+    name: haproxy.service
+    state: restarted
+- name: resatrt keepalived service
+  service:
+    name: keepalived.service
+    state: restarted
+- name: Allow all access from this host
+  ufw:
+    rule: allow
+    src: '{{ item }}'
+  with_items:
+    - "{{ master.ip1 }}"
+    - "{{ master.ip2 }}"
+    - "{{ worker.ip1 }}"
+- name: set firewall ports access
+  ufw:
+    rule: allow
+    port: '{{ item }}'
+  with_items:
+    - 6443
+    - 8404
+    - 10050
+- name: set firewall multi ports access
+  ufw:
+    rule: allow
+    port: 32768:65535
+    proto: tcp
+
+
+
+

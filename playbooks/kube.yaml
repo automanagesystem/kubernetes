@@ -1,0 +1,42 @@
+---
+- name: Update masters
+  hosts: masters
+  remote_user: root
+  vars:
+    other:
+      ip1: 192.168.45.133
+    master:
+      host1: node1
+      host2: node2
+      ip1: 192.168.45.131
+      ip2: 192.168.45.132
+    worker:
+      ip1: 192.168.45.133
+    ha:
+      netif: ens33
+      ip: 192.168.45.134
+      ip2: 192.168.45.135
+      vip: 192.168.45.100
+  roles:
+     - kubernetes
+- name: Update workers
+  hosts: workers
+  remote_user: root
+  vars:
+    other:
+      ip1: 192.168.45.131
+      ip2: 192.168.45.132
+    master:
+      host1: node1
+      host2: node2
+      ip1: 192.168.45.131
+      ip2: 192.168.45.132
+    worker:
+      ip1: 192.168.45.133
+    ha:
+      netif: ens33
+      ip: 192.168.45.134
+      ip2: 192.168.45.135
+      vip: 192.168.45.100
+  roles:
+     - kubernetes

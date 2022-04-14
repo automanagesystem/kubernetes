@@ -1,0 +1,218 @@
+- name: job1
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf 
+      br_netfilter 
+      EOF
+- name: job2
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      EOF
+- name: job3
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
+      overlay
+      br_netfilter
+      EOF
+- name: run modprobe
+  become: true
+  become_user: root
+  shell: 
+    cmd: |
+      modprobe overlay
+      modprobe br_netfilter
+- name: job4
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.ipv4.ip_forward                 = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      EOF
+- name: remove pkg if exist
+  apt:
+    name: "{{ packages }}"
+    state: absent
+  vars:
+    packages:
+    - docker
+    - docker-engine
+    - docker.io
+    - containerd
+    - runc
+- name: Install pkgs 
+  apt:
+    name: "{{ packages }}"
+    update_cache: yes
+  vars:
+    packages:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+- name: job5
+  become: true
+  become_user: root
+  shell: curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor --yes  -o /usr/share/keyrings/docker-archive-keyring.gpg
+- name: job6
+  become: true
+  become_user: root
+  shell: echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable"| sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+- name: Install docker 
+  apt:
+    name: "{{ packages }}"
+    update_cache: yes
+  vars:
+    packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+- name: job6
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      mkdir -p /etc/containerd
+      containerd config default | tee /etc/containerd/config.toml
+- name: resatrt containerd service
+  service:
+    name: containerd
+    state: restarted
+- name: copy config.toml file
+  template:
+    src: config.toml.j2
+    dest: /etc/containerd/config.toml
+- name: resatrt containerd service
+  service:
+    name: containerd
+    state: restarted
+- name: job7
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      mkdir -p /etc/containerd
+- name: create docker dir
+  file:
+    path: /etc/docker
+    state: directory
+- name: create docker daemon
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      cat <<EOF | tee /etc/docker/daemon.json
+      {
+      "exec-opts": ["native.cgroupdriver=systemd"],
+      "log-driver": "json-file",
+      "log-opts": {
+      "max-size": "100m"
+      },
+      "storage-driver": "overlay2"
+      }
+      EOF
+- name: job8
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      systemctl enable docker
+      systemctl daemon-reload
+- name: enable docker service
+  service:
+    name: docker
+    state: restarted
+- name: job9
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      curl  -fsSLo  /usr/share/keyrings/kubernetes-archive-keyring.gpg  https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main"| sudo tee /etc/apt/sources.list.d/kubernetes.list
+- name: Install kubernetes
+  apt:
+    name: "{{ packages }}"
+    update_cache: yes
+  vars:
+    packages:
+    - kubelet=1.22.2-00
+    - kubeadm=1.22.2-00
+    - kubectl=1.22.2-00
+- name: job10
+  become: true
+  become_user: root
+  shell: 
+    cmd: | 
+      apt-mark hold kubelet kubeadm kubectl
+      kubeadm completion bash > /etc/bash_completion.d/kubeadm
+      kubectl completion bash > /etc/bash_completion.d/kubctl
+- name: Allow all access from this host
+  ufw:
+    rule: allow
+    src: '{{ item }}'
+  with_items:
+    - "{{ ha.ip }}"
+    - "{{ ha.ip2 }}"
+    - "{{ ha.vip }}"
+- name: set firewall TCP ports access
+  ufw:
+    rule: allow
+    proto: tcp
+    port: '{{ item }}'
+  with_items:
+    - 6443
+    - 8080
+    - 10050
+    - 2379
+    - 2380
+    - 10250
+    - 10251
+    - 10252
+    - 10257
+    - 10259
+    - 443
+    - 80
+    - 32344
+    - 30060
+    - 30061
+    - 30062
+    - 53
+    - 30888
+    - 9100
+    - 32379
+    - 6783
+    - 6784
+    - 111
+    - 8443
+- name: set firewall UDP ports access
+  ufw:
+    rule: allow
+    proto: udp
+    port: '{{ item }}'
+  with_items:
+    - 53
+    - 6783
+    - 6784
+- name: set firewall multi ports access
+  ufw:
+    rule: allow
+    port: 30000:65535
+    proto: tcp
+ 
+
+
+
+

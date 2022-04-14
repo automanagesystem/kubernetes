@@ -1,0 +1,83 @@
+- name: copy debian repository file
+  template:
+    src: sources.list.j2
+    dest: /etc/apt/sources.list
+
+- name: Install base packages on Debian OS release
+  apt:
+    name: "{{ packages }}"
+    update_cache: yes
+  vars:
+    packages:
+    - vim 
+    - telnet
+    - nmap
+    - net-tools
+    - tcpdump
+    - tcptraceroute
+    - ufw
+    - sudo
+    - curl
+    - htop
+    - iftop
+    - unzip
+  tags: apt
+
+- name: change Time Zone to Asia/Tehran
+  become: true
+  become_user: root
+  shell: timedatectl set-timezone Asia/Tehran
+
+- name: copy hosts file
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+
+- name: copy resolve config file
+  template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+  tags: dns
+
+- name: Test for line
+  shell: grep -c "^export HISTTIMEFORMAT=" /etc/profile || true
+  register: test_grep
+  tags: history
+
+- name: add configuration
+  lineinfile:
+    dest: /etc/profile
+    line: export HISTTIMEFORMAT= "%d/%m/%y %T   "
+  when: test_grep.stdout == "0"
+  tags: history
+
+- name: Allow everything and enable UFW
+  ufw:
+    state: enabled
+    policy: allow
+  tags: ufw
+
+- name: Set logging
+  ufw:
+    logging: 'on'
+  tags: ufw
+
+- name: log rejected connections role
+  ufw:
+    rule: reject
+    port: auth
+    log: yes
+  tags: ufw
+
+- name: brute-force login attack role
+  ufw:
+    rule: limit
+    port: ssh
+    proto: tcp
+  tags: ufw
+
+- name: allow openssh service role
+  ufw:
+    rule: allow
+    name: OpenSSH
+  tags: ufw

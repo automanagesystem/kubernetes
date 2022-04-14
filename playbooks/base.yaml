@@ -1,0 +1,16 @@
+---
+- name: Update masters
+  hosts: masters
+  remote_user: root
+  roles:
+    - common
+- name: Update workers
+  hosts: workers
+  remote_user: root
+  roles:
+    - common
+- name: Update HA-proxy
+  hosts: haproxy
+  remote_user: root
+  roles:
+    - common
